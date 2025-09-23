@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Mappa Cantine e Distillerie – Valle di Cembra | Cantina Barone a Prato</title>
+  <meta name="description" content="Mappa interattiva di 19 cantine e 3 distillerie della Valle di Cembra (Trentino). Progetto a cura di Cantina Barone a Prato, attiva dal 1539.">
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <!-- MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin=""/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin=""/>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:24px;background:#fafafa;color:#111}
+    .wrap{max-width:1100px;margin:0 auto}
+    h1{font-size:24px;margin:0 0 8px}
+    p.lead{color:#555;margin:0 0 14px}
+    #map{height:520px;border:1px solid #eee;border-radius:12px}
+    .dedica{ text-align:center; margin-top:10px; font-size:14px; color:#555; }
+    .controls{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px}
+    .controls .group{background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 10px}
+    .controls label{margin-right:10px;font-size:14px;color:#333}
+    .controls button{border:1px solid #ddd;background:#fff;border-radius:10px;padding:6px 10px;font-weight:600;font-size:13px;cursor:pointer}
+    .controls button:hover{border-color:#bbb}
+    /* cluster colors (default ok) */
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Mappa Cantine e Distillerie – Valle di Cembra</h1>
+    <p class="lead">Clicca sui segnaposto per scoprire ogni cantina/distilleria e contattare direttamente il produttore. Puoi filtrare e zoomare sulle aree principali per orientarti meglio.</p>
+
+    <!-- CONTROLLI -->
+    <div class="controls">
+      <div class="group">
+        <label><input type="checkbox" id="toggleCantine" checked> Mostra Cantine</label>
+        <label><input type="checkbox" id="toggleDistillerie" checked> Mostra Distillerie</label>
+      </div>
+      <div class="group">
+        <button data-zoom="segonzano">Segonzano</button>
+        <button data-zoom="cembra">Cembra Lisignago</button>
+        <button data-zoom="giovo">Giovo</button>
+        <button data-zoom="altavalle">Altavalle (Faver)</button>
+        <button data-zoom="lona">Lona-Lases</button>
+        <button data-zoom="faedo">Faedo</button>
+        <button data-zoom="all">Tutta la valle</button>
+      </div>
+    </div>
+
+    <!-- MAPPA -->
+    <div id="map"></div>
+
+    <!-- DEDICA -->
+    <div class="dedica">Scopri tutte le cantine e distillerie della Valle di Cembra 🍷 – con ❤️ da Cantina Barone a Prato</div>
+  </div>
+
+  <!-- Script Leaflet & Cluster -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
+
+  <script>
+    /* MAPPA BASE */
+    const map = L.map('map', { zoomSnap: 0.25 }).setView([46.175, 11.22], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    /* ICONA (logo) */
+    const iconUrl = "https://www.baroneaprato.com/wp-content/uploads/2025/09/logo-cantine-val-di-cembra.png";
+    const wineIcon = L.icon({ iconUrl, iconSize:[40,40], iconAnchor:[20,40], popupAnchor:[0,-35],
+      shadowUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' });
+    const baroneIcon = L.icon({ iconUrl, iconSize:[48,48], iconAnchor:[24,48], popupAnchor:[0,-40],
+      shadowUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' });
+
+    /* UTILITÀ */
+    const prettyTel = t => (t||'').replace(/^\+39/, '+39 ').replace(/(\d{3})(\d{3})(\d{3,})$/, '$1 $2 $3');
+    const btn = (label, href, primary=false, show=null) =>
+      `<a href="${href}" target="_blank" rel="noopener"
+         style="display:inline-block;margin:6px 6px 0 0;padding:8px 12px;border-radius:8px;
+         border:1px solid ${primary?'#111':'#ddd'};background:${primary?'#111':'#fff'};
+         color:${primary?'#fff':'#111'};text-decoration:none;font-weight:600;font-size:13px">
+         ${show||label}</a>`;
+
+    const popupHtml = (w) => {
+      const links = [];
+      if (w.url)   links.push(btn('Apri sito', w.url));
+      if (w.maps)  links.push(btn('Apri indicazioni', w.maps, true));
+      if (w.tel)   links.push(btn('Chiama', 'tel:'+w.tel, false, 'Chiama ' + prettyTel(w.tel)));
+      if (w.email) links.push(btn('Email', 'mailto:'+w.email));
+      return `${w.name}<br/><small>${w.town}</small><div style="margin-top:6px">${links.join('')}</div>`;
+    };
+
+    /* DATI – 22 realtà (type: 'cantina' | 'distilleria') */
+    const WINERIES = [
+      { type:'cantina', name:'Cantina Barone a Prato dal 1539', town:'Segonzano (Piazzo)', url:'https://www.baroneaprato.com/', email:'paolo@baroneaprato.com', tel:'+393477593662', lat:46.182920265226, lng:11.251048352853, maps:'https://www.google.com/maps/dir/?api=1&destination=46.182920265226,11.251048352853&travelmode=driving' },
+
+      { type:'cantina', name:'Cantina Béghel', town:'Segonzano (Sevignano)', url:'https://www.cantinabeghel.it/', tel:'+393450695084', lat:46.172796, lng:11.251493, maps:'https://www.google.com/maps/dir/?api=1&destination=46.172796,11.251493&travelmode=driving' },
+
+      { type:'distilleria', name:'Distilleria Giacomozzi Renzo', town:'Segonzano', tel:'+393486686100', lat:46.186773100444, lng:11.260688466145, maps:'https://www.google.com/maps/dir/?api=1&destination=46.186773100444,11.260688466145&travelmode=driving' },
+
+      { type:'distilleria', name:'Distilleria Pilzer', town:'Faver (Altavalle)', url:'http://www.pilzer.it/', tel:'+390461683326', lat:46.197641952539, lng:11.246419787697, maps:'https://www.google.com/maps/dir/?api=1&destination=46.197641952539,11.246419787697&travelmode=driving' },
+
+      { type:'cantina', name:'Pietra di Confine (Fratelli Giorgio e Federico Paolazzi)', town:'Faver (Altavalle)', email:'federicopaolazzi80@gmail.com', tel:'+393402473228', lat:46.1835637, lng:11.2405526, maps:'https://www.google.com/maps/dir/?api=1&destination=46.1835637,11.2405526&travelmode=driving' },
+
+      { type:'distilleria', name:'Paolazzi Vittorio – Distilleria', town:'Faver (Altavalle)', url:'https://www.grappapaolazzi.com/', tel:'+393476805616', lat:46.1844779, lng:11.2420793, maps:'https://www.google.com/maps/dir/?api=1&destination=46.1844779,11.2420793&travelmode=driving' },
+
+      { type:'cantina', name:'Corvée', town:'Cembra Lisignago (Lisignago)', url:'https://www.corvee.wine/', tel:'+393499885827', lat:46.16892747275, lng:11.210182216302, maps:'https://www.google.com/maps/dir/?api=1&destination=46.16892747275,11.210182216302&travelmode=driving' },
+
+      { type:'cantina', name:'Alfio Nicolodi', town:'Cembra Lisignago (Cembra)', tel:'+393484433199', lat:46.1771797, lng:11.2240382, maps:'https://www.google.com/maps/dir/?api=1&destination=46.1771797,11.2240382&travelmode=driving' },
+
+      { type:'cantina', name:'Cantina Pelz', town:'Cembra Lisignago (Lisignago)', url:'https://www.instagram.com/cantina_pelz/', tel:'+393485900192', lat:46.169284115869, lng:11.217799689905, maps:'https://www.google.com/maps/dir/?api=1&destination=46.169284115869,11.217799689905&travelmode=driving' },
+
+      { type:'cantina', name:'Cembra Cantina di Montagna', town:'Cembra Lisignago (Cembra)', url:'https://www.cembracantinadimontagna.it/', email:'info@cembracantinadimontagna.com', tel:'+390461680010', lat:46.1755432, lng:11.2233049, maps:'https://www.google.com/maps/dir/?api=1&destination=46.1755432,11.2233049&travelmode=driving' },
+
+      { type:'cantina', name:'Tenuta Gottardi', town:'Cembra Lisignago (Cembra)', url:'http://www.tenutagottardi.it/', tel:'+393463285606', lat:46.176919685286, lng:11.223373012164, maps:'https://www.google.com/maps/dir/?api=1&destination=46.176919685286,11.223373012164&travelmode=driving' },
+
+      { type:'cantina', name:'Cantina Toniolli', town:'Cembra Lisignago (Lisignago)', url:'http://www.cantinatoniolli.com/', email:'info@cantinatoniolli.com', tel:'+393486950258', lat:46.170340786963, lng:11.219238514542, maps:'https://www.google.com/maps/dir/?api=1&destination=46.170340786963,11.219238514542&travelmode=driving' },
+
+      { type:'cantina', name:'Zanotelli', town:'Cembra Lisignago (Cembra)', url:'https://www.zanotelliwines.com/', tel:'+390461680362', lat:46.1747996, lng:11.2212154, maps:'https://www.google.com/maps/dir/?api=1&destination=46.1747996,11.2212154&travelmode=driving' },
+
+      { type:'cantina', name:'Cantina Simoni', town:'Giovo (Palù)', url:'https://www.cantinasimoni.it/', email:'info@cantinasimoni.it', tel:'+393490504864', lat:46.1582951, lng:11.1405473, maps:'https://www.google.com/maps/dir/?api=1&destination=46.1582951,11.1405473&travelmode=driving' },
+
+      { type:'cantina', name:'Maso Belvedere', town:'Giovo (Verla)', url:'https://masobelvedere.it/', email:'info@masobelvedere.it', tel:'+393392528710', lat:46.163235, lng:11.165742, maps:'https://www.google.com/maps/dir/?api=1&destination=46.163235,11.165742&travelmode=driving' },
+
+      { type:'cantina', name:'Man Spumanti', town:'Giovo (Verla)', url:'https://www.manspumanti.it', email:'info@manspumanti.it', tel:'+393489238968', lat:46.1585379, lng:11.1537571, maps:'https://www.google.com/maps/dir/?api=1&destination=46.1585379,11.1537571&travelmode=driving' },
+
+      { type:'cantina', name:'Villa Corniole', town:'Giovo (Verla)', url:'https://www.villacorniole.com/', email:'info@villacorniole.com', tel:'+390461695067', lat:46.158721833482, lng:11.155152557672, maps:'https://www.google.com/maps/dir/?api=1&destination=46.158721833482,11.155152557672&travelmode=driving' },
+
+      { type:'cantina', name:'Cantina Micheli', town:'Lona-Lases (Lona)', url:'http://www.cantinamicheli.it/', tel:'+393484433199', lat:46.1583452, lng:11.2317809, maps:'https://www.google.com/maps/dir/?api=1&destination=46.1583452,11.2317809&travelmode=driving' },
+
+      { type:'cantina', name:'Pojer e Sandri', town:"Faedo (San Michele all'Adige)", url:"https://www.pojeresandri.com/", tel:"+390461650342", lat:46.198661, lng:11.133553, maps:"https://www.google.com/maps/dir/?api=1&destination=46.198661,11.133553&travelmode=driving" },
+
+      { type:'cantina', name:'Tenute Novei (Cantina Novel)', town:'Cembra Lisignago (Cembra)', url:'https://www.tenutenovei.it/', tel:'+393513157612', lat:46.176102, lng:11.220893, maps:'https://www.google.com/maps/dir/?api=1&destination=46.176102,11.220893&travelmode=driving' },
+
+      { type:'cantina', name:'Cantina MoS', town:'Cembra Lisignago (Lisignago)', url:'https://www.agricola-mos.it/', email:'info@agricola-mos.it', tel:'+393208258736', lat:46.165374, lng:11.210597, maps:'https://www.google.com/maps/dir/?api=1&destination=46.165374,11.210597&travelmode=driving' },
+
+      { type:'cantina', name:'La Campirlòta', town:'Cembra Lisignago (Lisignago)', url:'https://www.lacampirlota.it/', email:'info@lacampirlota.it', tel:'+393495805345', lat:46.171973, lng:11.218412, maps:'https://www.google.com/maps/dir/?api=1&destination=46.171973,11.218412&travelmode=driving' }
+    ];
+
+    /* CLUSTER LAYERS per tipo */
+    const clusterCantine = L.markerClusterGroup({
+      spiderfyOnMaxZoom:true, showCoverageOnHover:false, disableClusteringAtZoom:16, maxClusterRadius:50
+    });
+    const clusterDist = L.markerClusterGroup({
+      spiderfyOnMaxZoom:true, showCoverageOnHover:false, disableClusteringAtZoom:16, maxClusterRadius:50
+    });
+
+    /* CREAZIONE MARKER */
+    const allMarkers = [];
+    WINERIES.forEach(w => {
+      if (!w.lat || !w.lng) return;
+      const iconChoice = (w.name === 'Cantina Barone a Prato dal 1539' ? baroneIcon : wineIcon);
+      const marker = L.marker([w.lat, w.lng], { icon: iconChoice }).bindPopup(popupHtml(w));
+      (w.type === 'distilleria' ? clusterDist : clusterCantine).addLayer(marker);
+      allMarkers.push(marker);
+    });
+
+    /* AGGIUNTA LAYERS */
+    clusterCantine.addTo(map);
+    clusterDist.addTo(map);
+
+    /* FIT BOUNDS INIZIALE */
+    if (allMarkers.length){
+      const group = L.featureGroup(allMarkers);
+      map.fitBounds(group.getBounds().pad(0.2));
+    }
+
+    /* FILTRI ON/OFF */
+    const chkCant = document.getElementById('toggleCantine');
+    const chkDist = document.getElementById('toggleDistillerie');
+    chkCant.addEventListener('change', () => {
+      if (chkCant.checked) map.addLayer(clusterCantine); else map.removeLayer(clusterCantine);
+    });
+    chkDist.addEventListener('change', () => {
+      if (chkDist.checked) map.addLayer(clusterDist); else map.removeLayer(clusterDist);
+    });
+
+    /* ZOOM RAPIDI */
+    const ZOOMS = {
+      segonzano: [[46.165,11.235],[46.195,11.265]],
+      cembra:    [[46.162,11.205],[46.182,11.230]],
+      giovo:     [[46.150,11.135],[46.170,11.170]],
+      altavalle: [[46.178,11.235],[46.205,11.255]],
+      lona:      [[46.152,11.225],[46.165,11.240]],
+      faedo:     [[46.192,11.128],[46.205,11.140]],
+      all:       null
+    };
+    document.querySelectorAll('.controls button[data-zoom]').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        const key = b.getAttribute('data-zoom');
+        if (key==='all'){
+          const grp = L.featureGroup(allMarkers);
+          map.fitBounds(grp.getBounds().pad(0.2));
+        } else {
+          const bounds = ZOOMS[key];
+          if (bounds) map.fitBounds(bounds);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

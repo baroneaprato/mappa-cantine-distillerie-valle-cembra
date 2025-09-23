@@ -5,36 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Mappa Cantine e Distillerie – Valle di Cembra | Cantina Barone a Prato</title>
   <meta name="description" content="Mappa interattiva di 19 cantine e 3 distillerie della Valle di Cembra (Trentino). Progetto a cura di Cantina Barone a Prato, attiva dal 1539.">
+  <link rel="icon" href="https://www.baroneaprato.com/wp-content/uploads/2025/09/logo-cantine-val-di-cembra.png">
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   <!-- MarkerCluster -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin=""/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin=""/>
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:24px;background:#fafafa;color:#111}
+    :root { --card:#fff; --text:#111; --muted:#555; --line:#eee; }
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:24px;background:#fafafa;color:var(--text)}
     .wrap{max-width:1100px;margin:0 auto}
-    h1{font-size:24px;margin:0 0 8px}
-    p.lead{color:#555;margin:0 0 14px}
-    #map{height:520px;border:1px solid #eee;border-radius:12px}
-    .dedica{ text-align:center; margin-top:10px; font-size:14px; color:#555; }
-    .controls{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px}
-    .controls .group{background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 10px}
-    .controls label{margin-right:10px;font-size:14px;color:#333}
+    h1{font-size:22px;margin:0 0 12px}
+    #map{height:560px;border:1px solid var(--line);border-radius:12px}
+    .controls{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 14px}
+    .controls .group{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+    .controls label{margin-right:10px;font-size:14px;color:#333;cursor:pointer}
+    .controls input{margin-right:6px;vertical-align:middle}
     .controls button{border:1px solid #ddd;background:#fff;border-radius:10px;padding:6px 10px;font-weight:600;font-size:13px;cursor:pointer}
     .controls button:hover{border-color:#bbb}
-    /* cluster colors (default ok) */
+    .credit{text-align:center;font-size:14px;color:#666;margin-top:10px}
+    @media (max-width:600px){ #map{height:65vh} }
   </style>
+
+  <!-- Plausible (opzionale: puoi tenere o rimuovere) -->
+  <!-- <script defer data-domain="baroneaprato.github.io,mappe.baroneaprato.com" src="https://plausible.io/js/script.js"></script> -->
 </head>
 <body>
   <div class="wrap">
     <h1>Mappa Cantine e Distillerie – Valle di Cembra</h1>
-    <p class="lead">Clicca sui segnaposto per scoprire ogni cantina/distilleria e contattare direttamente il produttore. Puoi filtrare e zoomare sulle aree principali per orientarti meglio.</p>
 
     <!-- CONTROLLI -->
     <div class="controls">
       <div class="group">
-        <label><input type="checkbox" id="toggleCantine" checked> Mostra Cantine</label>
-        <label><input type="checkbox" id="toggleDistillerie" checked> Mostra Distillerie</label>
+        <label><input type="checkbox" id="toggleCantine" checked>Mostra Cantine</label>
+        <label><input type="checkbox" id="toggleDistillerie" checked>Mostra Distillerie</label>
       </div>
       <div class="group">
         <button data-zoom="segonzano">Segonzano</button>
@@ -50,8 +54,8 @@
     <!-- MAPPA -->
     <div id="map"></div>
 
-    <!-- DEDICA -->
-    <div class="dedica">Scopri tutte le cantine e distillerie della Valle di Cembra 🍷 – con ❤️ da Cantina Barone a Prato</div>
+    <!-- UNICO CREDIT -->
+    <div class="credit">Mappa realizzata con ❤️ da Cantina Barone a Prato (dal 1539)</div>
   </div>
 
   <!-- Script Leaflet & Cluster -->
@@ -65,7 +69,7 @@
       maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    /* ICONA (logo) */
+    /* ICONA (logo bicchiere) */
     const iconUrl = "https://www.baroneaprato.com/wp-content/uploads/2025/09/logo-cantine-val-di-cembra.png";
     const wineIcon = L.icon({ iconUrl, iconSize:[40,40], iconAnchor:[20,40], popupAnchor:[0,-35],
       shadowUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' });
@@ -137,7 +141,7 @@
       { type:'cantina', name:'La Campirlòta', town:'Cembra Lisignago (Lisignago)', url:'https://www.lacampirlota.it/', email:'info@lacampirlota.it', tel:'+393495805345', lat:46.171973, lng:11.218412, maps:'https://www.google.com/maps/dir/?api=1&destination=46.171973,11.218412&travelmode=driving' }
     ];
 
-    /* CLUSTER LAYERS per tipo */
+    /* CLUSTER per tipo */
     const clusterCantine = L.markerClusterGroup({
       spiderfyOnMaxZoom:true, showCoverageOnHover:false, disableClusteringAtZoom:16, maxClusterRadius:50
     });
@@ -145,7 +149,7 @@
       spiderfyOnMaxZoom:true, showCoverageOnHover:false, disableClusteringAtZoom:16, maxClusterRadius:50
     });
 
-    /* CREAZIONE MARKER */
+    /* MARKER */
     const allMarkers = [];
     WINERIES.forEach(w => {
       if (!w.lat || !w.lng) return;
@@ -155,7 +159,7 @@
       allMarkers.push(marker);
     });
 
-    /* AGGIUNTA LAYERS */
+    /* AGGIUNTA LAYER */
     clusterCantine.addTo(map);
     clusterDist.addTo(map);
 
@@ -165,7 +169,7 @@
       map.fitBounds(group.getBounds().pad(0.2));
     }
 
-    /* FILTRI ON/OFF */
+    /* FILTRI */
     const chkCant = document.getElementById('toggleCantine');
     const chkDist = document.getElementById('toggleDistillerie');
     chkCant.addEventListener('change', () => {
